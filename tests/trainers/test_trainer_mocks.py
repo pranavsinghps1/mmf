@@ -10,7 +10,6 @@ from mmf.datasets.mmf_dataset_builder import MMFDatasetBuilder
 from mmf.datasets.multi_datamodule import MultiDataModule
 from mmf.trainers.callbacks.lr_scheduler import LRSchedulerCallback
 from mmf.trainers.mmf_trainer import MMFTrainer
-from mmf.utils.configuration import load_yaml
 from omegaconf import OmegaConf
 from tests.test_utils import NumbersDataset, SimpleModel
 
@@ -58,56 +57,12 @@ class MultiDataModuleNumbersTestObject(MultiDataModule):
 
 class TrainerTrainingLoopMock(MMFTrainer):
     def __init__(
-        self,
-        num_train_data,
-        max_updates,
-        max_epochs,
-        config=None,
-        optimizer=None,
-        update_frequency=1,
-        batch_size=1,
-        batch_size_per_device=None,
-        fp16=False,
-        on_update_end_fn=None,
-        scheduler_config=None,
-        grad_clipping_config=None,
-        tensorboard=False,
+        self, num_train_data, config=None, optimizer=None, on_update_end_fn=None
     ):
-        if config is None:
-            self.config = load_yaml("configs/defaults.yaml")
-            self.config = OmegaConf.merge(
-                self.config,
-                {
-                    "training": {
-                        "detect_anomaly": False,
-                        "evaluation_interval": 10000,
-                        "update_frequency": update_frequency,
-                        "fp16": fp16,
-                        "batch_size": batch_size,
-                        "batch_size_per_device": batch_size_per_device,
-                        "tensorboard": tensorboard,
-                        "run_type": "train",
-                        "num_workers": 0,
-                    },
-                    "datasets": "",
-                    "model": "",
-                },
-            )
-            self.training_config = self.config.training
-        else:
-            config.training.batch_size = batch_size
-            config.training.fp16 = fp16
-            config.training.update_frequency = update_frequency
-            config.training.tensorboard = tensorboard
-            self.training_config = config.training
-            self.config = config
-
+        self.training_config = config.training
+        self.config = config
         registry.register("config", self.config)
 
-        if max_updates is not None:
-            self.training_config["max_updates"] = max_updates
-        if max_epochs is not None:
-            self.training_config["max_epochs"] = max_epochs
         self.model = SimpleModel({"in_dim": 1})
         self.model.build()
         if torch.cuda.is_available():
@@ -124,9 +79,7 @@ class TrainerTrainingLoopMock(MMFTrainer):
         else:
             self.optimizer = optimizer
 
-        if scheduler_config:
-            config.training.lr_scheduler = True
-            config.scheduler = scheduler_config
+        if config.training.lr_scheduler:
             self.lr_scheduler_callback = LRSchedulerCallback(config, self)
             self.callbacks.append(self.lr_scheduler_callback)
             on_update_end_fn = (
@@ -134,12 +87,6 @@ class TrainerTrainingLoopMock(MMFTrainer):
                 if on_update_end_fn
                 else self.lr_scheduler_callback.on_update_end
             )
-        if grad_clipping_config:
-            self.training_config.clip_gradients = True
-            self.training_config.max_grad_l2_norm = grad_clipping_config[
-                "max_grad_l2_norm"
-            ]
-            self.training_config.clip_norm_mode = grad_clipping_config["clip_norm_mode"]
 
         self.on_batch_start = MagicMock(return_value=None)
         self.on_update_start = MagicMock(return_value=None)

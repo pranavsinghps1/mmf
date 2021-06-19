@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import torch
 from tests.trainers.test_training_loop import TrainerTrainingLoopMock
+from tests.trainers.test_utils import get_config
 
 
 class TestEvalLoop(unittest.TestCase):
@@ -17,7 +18,8 @@ class TestEvalLoop(unittest.TestCase):
     )
     @patch("mmf.common.test_reporter.get_mmf_env", return_value="")
     def test_eval_loop(self, a, b):
-        trainer = TrainerTrainingLoopMock(100, max_updates=2, max_epochs=2)
+        config = get_config({"training": {"max_updates": 2, "max_epochs": 2}})
+        trainer = TrainerTrainingLoopMock(num_train_data=100, config=config)
         trainer.load_datasets()
         combined_report, meter = trainer.evaluation_loop("val")
         self.assertAlmostEqual(combined_report["losses"]["loss"], 493377.5312)
